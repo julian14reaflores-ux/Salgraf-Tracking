@@ -1,8 +1,7 @@
 // src/pages/api/scrape.js
-// Endpoint API para realizar web scraping de guías
+// Endpoint API para realizar web scraping de guías usando Playwright
 
-import chromium from '@sparticuz/chromium';
-import puppeteer from 'puppeteer-core';
+import { chromium } from 'playwright-core';
 import {
   buildTrackingUrl,
   isValidGuia,
@@ -18,43 +17,29 @@ import {
 
 /**
  * Obtiene el navegador configurado según el entorno
- * @returns {Promise<Object>} Navegador de Puppeteer
+ * @returns {Promise<Object>} Navegador de Playwright
  */
 async function getBrowser() {
-  if (process.env.VERCEL_ENV) {
-    // En producción (Vercel), usar @sparticuz/chromium
-    const executablePath = await chromium.executablePath();
-    
-    return await puppeteer.launch({
+  try {
+    return await chromium.launch({
+      headless: true,
       args: [
-        ...chromium.args,
         '--disable-gpu',
         '--disable-dev-shm-usage',
         '--disable-setuid-sandbox',
-        '--no-first-run',
         '--no-sandbox',
-        '--no-zygote',
-        '--single-process',
       ],
-      defaultViewport: chromium.defaultViewport,
-      executablePath,
-      headless: chromium.headless,
-      ignoreHTTPSErrors: true,
     });
-  } else {
-    // En desarrollo local, intentar usar Chrome instalado
-    const puppeteerLocal = await import('puppeteer');
-    return await puppeteerLocal.default.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
+  } catch (error) {
+    console.error('Error al lanzar navegador:', error);
+    throw new Error('No se pudo inicializar el navegador');
   }
 }
 
 /**
  * Realiza scraping de una guía específica
  * @param {string} guia - Número de guía
- * @param {Object} browser - Navegador de Puppeteer
+ * @param {Object} browser - Navegador de Playwright
  * @returns {Promise<Object>} Datos extraídos
  */
 async function scrapeGuia(guia, browser) {
@@ -65,20 +50,20 @@ async function scrapeGuia(guia, browser) {
     page = await browser.newPage();
     
     // Configurar user agent
-    await page.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    );
+    await page.setExtraHTTPHeaders({
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    });
     
     console.log(`Navegando a: ${url}`);
     
     // Navegar a la página
     await page.goto(url, {
-      waitUntil: 'networkidle2',
+      waitUntil: 'networkidle',
       timeout: 30000,
     });
 
     // Esperar a que la página cargue
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await page.waitForTimeout(2000);
 
     // Extraer datos de la página
     const data = await page.evaluate(() => {
