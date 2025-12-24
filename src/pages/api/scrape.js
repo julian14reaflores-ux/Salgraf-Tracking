@@ -1,7 +1,7 @@
 // src/pages/api/scrape.js
 // Endpoint API para realizar web scraping de guías
 
-import chromium from 'chrome-aws-lambda';
+import chromium from '@sparticuz/chromium';
 import puppeteer from 'puppeteer-core';
 import {
   buildTrackingUrl,
@@ -21,17 +21,17 @@ import {
  * @returns {Promise<Object>} Navegador de Puppeteer
  */
 async function getBrowser() {
-  if (process.env.VERCEL) {
-    // En producción (Vercel), usar chrome-aws-lambda
+  if (process.env.VERCEL_ENV) {
+    // En producción (Vercel), usar @sparticuz/chromium
     return await puppeteer.launch({
       args: chromium.args,
       defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath,
+      executablePath: await chromium.executablePath(),
       headless: chromium.headless,
       ignoreHTTPSErrors: true,
     });
   } else {
-    // En desarrollo local, usar Puppeteer regular
+    // En desarrollo local, usar Chrome instalado
     return await puppeteer.launch({
       headless: 'new',
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -65,7 +65,7 @@ async function scrapeGuia(guia, browser) {
       timeout: 30000,
     });
 
-    // Esperar a que la página cargue (ajustar selector según la estructura real)
+    // Esperar a que la página cargue
     await page.waitForTimeout(2000);
 
     // Extraer datos de la página
@@ -87,7 +87,6 @@ async function scrapeGuia(guia, browser) {
         for (const row of rows) {
           const text = row.textContent;
           if (text.toLowerCase().includes(labelText.toLowerCase())) {
-            // Buscar el valor en la siguiente celda o elemento
             const cells = row.querySelectorAll('td, .cell, span, div');
             if (cells.length > 1) {
               return cells[cells.length - 1].textContent.trim();
@@ -160,8 +159,6 @@ async function scrapeGuia(guia, browser) {
       // Si no encontramos estado, buscar en todo el contenido visible
       if (!estado) {
         const bodyText = document.body.textContent;
-        
-        // Patrones comunes de estados
         const estadoPatterns = [
           /Estado[:\s]*([^\n<>]+)/i,
           /Status[:\s]*([^\n<>]+)/i,
