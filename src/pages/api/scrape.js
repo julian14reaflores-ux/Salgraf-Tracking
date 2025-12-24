@@ -23,16 +23,28 @@ import {
 async function getBrowser() {
   if (process.env.VERCEL_ENV) {
     // En producción (Vercel), usar @sparticuz/chromium
+    const executablePath = await chromium.executablePath();
+    
     return await puppeteer.launch({
-      args: chromium.args,
+      args: [
+        ...chromium.args,
+        '--disable-gpu',
+        '--disable-dev-shm-usage',
+        '--disable-setuid-sandbox',
+        '--no-first-run',
+        '--no-sandbox',
+        '--no-zygote',
+        '--single-process',
+      ],
       defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
+      executablePath,
       headless: chromium.headless,
       ignoreHTTPSErrors: true,
     });
   } else {
-    // En desarrollo local, usar Chrome instalado
-    return await puppeteer.launch({
+    // En desarrollo local, intentar usar Chrome instalado
+    const puppeteerLocal = await import('puppeteer');
+    return await puppeteerLocal.default.launch({
       headless: 'new',
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
@@ -52,7 +64,7 @@ async function scrapeGuia(guia, browser) {
   try {
     page = await browser.newPage();
     
-    // Configurar timeout y user agent
+    // Configurar user agent
     await page.setUserAgent(
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     );
@@ -66,7 +78,7 @@ async function scrapeGuia(guia, browser) {
     });
 
     // Esperar a que la página cargue
-    await page.waitForTimeout(2000);
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
     // Extraer datos de la página
     const data = await page.evaluate(() => {
@@ -156,7 +168,7 @@ async function scrapeGuia(guia, browser) {
         fechaEntrega = findInTable('fecha');
       }
 
-      // Si no encontramos estado, buscar en todo el contenido visible
+      // Si no encontramos estado, buscar en todo el contenido
       if (!estado) {
         const bodyText = document.body.textContent;
         const estadoPatterns = [
@@ -204,7 +216,6 @@ async function scrapeGuia(guia, browser) {
  * Handler principal del endpoint
  */
 export default async function handler(req, res) {
-  // Solo permitir POST
   if (req.method !== 'POST') {
     return res.status(405).json({
       success: false,
@@ -217,7 +228,6 @@ export default async function handler(req, res) {
   try {
     const { guias } = req.body;
 
-    // Validar entrada
     if (!guias || !Array.isArray(guias) || guias.length === 0) {
       return res.status(400).json({
         success: false,
@@ -225,10 +235,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // Limpiar y validar guías
-    const guiasLimpias = guias
-      .map(cleanGuia)
-      .filter(isValidGuia);
+    const guiasLimpias = guias.map(cleanGuia).filter(isValidGuia);
 
     if (guiasLimpias.length === 0) {
       return res.status(400).json({
@@ -239,10 +246,8 @@ export default async function handler(req, res) {
 
     console.log(`Iniciando scraping de ${guiasLimpias.length} guías...`);
 
-    // Inicializar navegador
     browser = await getBrowser();
 
-    // Realizar scraping de cada guía con delay
     const results = [];
     const delayMs = getScrapingDelay();
 
@@ -260,7 +265,6 @@ export default async function handler(req, res) {
           ...cleanData,
         });
 
-        // Delay entre peticiones (excepto en la última)
         if (i < guiasLimpias.length - 1) {
           await delay(delayMs);
         }
@@ -270,10 +274,8 @@ export default async function handler(req, res) {
       }
     }
 
-    // Cerrar navegador
     await browser.close();
 
-    // Calcular estadísticas
     const successful = results.filter(r => r.success).length;
     const failed = results.length - successful;
 
@@ -288,7 +290,6 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('Error en endpoint de scraping:', error);
     
-    // Intentar cerrar el navegador si está abierto
     if (browser) {
       try {
         await browser.close();
