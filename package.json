@@ -1,0 +1,30 @@
+{
+  "name": "laar-tracking",
+  "version": "1.0.0",
+  "description": "Sistema de tracking para guías LAAR Courier",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "^14.0.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "googleapis": "^128.0.0",
+    "puppeteer": "^21.6.1",
+    "puppeteer-core": "^21.6.1",
+    "chrome-aws-lambda": "^10.1.0",
+    "date-fns": "^3.0.6",
+    "date-fns-tz": "^2.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.56.0",
+    "eslint-config-next": "^14.0.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
