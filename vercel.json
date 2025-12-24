@@ -20,7 +20,7 @@
     }
   ],
   "functions": {
-    "api/**/*.js": {
+    "src/pages/api/**/*.js": {
       "memory": 1024,
       "maxDuration": 60
     }
