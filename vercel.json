@@ -19,9 +19,6 @@
       "schedule": "0 16 * * *"
     }
   ],
-  "env": {
-    "TZ": "America/Guayaquil"
-  },
   "functions": {
     "api/**/*.js": {
       "memory": 1024,
