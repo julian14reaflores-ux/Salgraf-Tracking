@@ -1,0 +1,129 @@
+#!/usr/bin/env node
+// scripts/test-setup.js
+// Script para verificar que todo esté configurado correctamente
+
+const fs = require('fs');
+const path = require('path');
+
+console.log('🔍 Verificando configuración del proyecto...\n');
+
+let errors = 0;
+let warnings = 0;
+
+// 1. Verificar que .env.local existe
+console.log('1. Verificando archivo .env.local...');
+const envPath = path.join(process.cwd(), '.env.local');
+if (fs.existsSync(envPath)) {
+  console.log('   ✅ .env.local encontrado');
+  
+  // Leer y verificar variables requeridas
+  const envContent = fs.readFileSync(envPath, 'utf8');
+  const requiredVars = [
+    'GOOGLE_SHEETS_SPREADSHEET_ID',
+    'GOOGLE_SERVICE_ACCOUNT_EMAIL',
+    'GOOGLE_PRIVATE_KEY',
+  ];
+  
+  const missingVars = requiredVars.filter(varName => !envContent.includes(varName));
+  
+  if (missingVars.length > 0) {
+    console.log(`   ⚠️  Faltan variables: ${missingVars.join(', ')}`);
+    warnings++;
+  } else {
+    console.log('   ✅ Todas las variables requeridas están presentes');
+  }
+} else {
+  console.log('   ❌ .env.local NO encontrado');
+  console.log('   💡 Copia .env.example a .env.local y completa los valores');
+  errors++;
+}
+
+// 2. Verificar node_modules
+console.log('\n2. Verificando dependencias...');
+const nodeModulesPath = path.join(process.cwd(), 'node_modules');
+if (fs.existsSync(nodeModulesPath)) {
+  console.log('   ✅ node_modules encontrado');
+} else {
+  console.log('   ❌ node_modules NO encontrado');
+  console.log('   💡 Ejecuta: npm install');
+  errors++;
+}
+
+// 3. Verificar estructura de carpetas
+console.log('\n3. Verificando estructura de carpetas...');
+const requiredDirs = [
+  'src/pages',
+  'src/pages/api',
+  'src/components',
+  'src/lib',
+  'src/styles',
+  'config',
+];
+
+let allDirsExist = true;
+requiredDirs.forEach(dir => {
+  const dirPath = path.join(process.cwd(), dir);
+  if (fs.existsSync(dirPath)) {
+    console.log(`   ✅ ${dir}`);
+  } else {
+    console.log(`   ❌ ${dir} NO existe`);
+    allDirsExist = false;
+    errors++;
+  }
+});
+
+// 4. Verificar archivos críticos
+console.log('\n4. Verificando archivos críticos...');
+const requiredFiles = [
+  'package.json',
+  'next.config.js',
+  'src/pages/index.js',
+  'src/pages/_app.js',
+  'src/lib/utils.js',
+  'src/lib/sheets.js',
+  'src/lib/scraper.js',
+];
+
+requiredFiles.forEach(file => {
+  const filePath = path.join(process.cwd(), file);
+  if (fs.existsSync(filePath)) {
+    console.log(`   ✅ ${file}`);
+  } else {
+    console.log(`   ❌ ${file} NO existe`);
+    errors++;
+  }
+});
+
+// 5. Verificar version de Node.js
+console.log('\n5. Verificando versión de Node.js...');
+const nodeVersion = process.version;
+const majorVersion = parseInt(nodeVersion.split('.')[0].substring(1));
+
+if (majorVersion >= 18) {
+  console.log(`   ✅ Node.js ${nodeVersion} (requerido: >= 18)`);
+} else {
+  console.log(`   ⚠️  Node.js ${nodeVersion} (recomendado: >= 18)`);
+  warnings++;
+}
+
+// Resumen
+console.log('\n' + '='.repeat(50));
+console.log('📊 RESUMEN DE VERIFICACIÓN\n');
+
+if (errors === 0 && warnings === 0) {
+  console.log('✅ ¡Todo está configurado correctamente!');
+  console.log('\n🚀 Puedes ejecutar: npm run dev');
+} else {
+  if (errors > 0) {
+    console.log(`❌ ${errors} error(es) encontrado(s)`);
+  }
+  if (warnings > 0) {
+    console.log(`⚠️  ${warnings} advertencia(s) encontrada(s)`);
+  }
+  console.log('\n💡 Revisa los problemas indicados arriba');
+}
+
+console.log('='.repeat(50) + '\n');
+
+// Exit code
+process.exit(errors > 0 ? 1 : 0);
