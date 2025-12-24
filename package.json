@@ -16,7 +16,7 @@
     "googleapis": "^128.0.0",
     "puppeteer-core": "^10.1.0",
     "chrome-aws-lambda": "^10.1.0",
-    "date-fns": "^3.0.6",
+    "date-fns": "^2.30.0",
     "date-fns-tz": "^2.0.0"
   },
   "devDependencies": {
