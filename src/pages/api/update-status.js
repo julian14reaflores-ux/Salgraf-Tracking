@@ -7,12 +7,7 @@ import {
 } from '../../lib/sheets.js';
 import { isFinalState, handleError } from '../../lib/utils.js';
 
-/**
- * Handler principal del endpoint
- * Actualiza todas las guías que no están en estado final
- */
 export default async function handler(req, res) {
-  // Solo permitir POST
   if (req.method !== 'POST') {
     return res.status(405).json({
       success: false,
@@ -23,11 +18,9 @@ export default async function handler(req, res) {
   try {
     console.log('Iniciando actualización de estados...');
 
-    // Obtener todas las guías
     const todasLasGuias = await getAllGuias();
     console.log(`Total de guías: ${todasLasGuias.length}`);
 
-    // Filtrar guías que no están en estado final
     const guiasPendientes = todasLasGuias.filter(
       guia => !isFinalState(guia.estado)
     );
@@ -43,22 +36,21 @@ export default async function handler(req, res) {
       });
     }
 
-    // Preparar lista de guías para hacer scraping
     const guiasParaScraping = guiasPendientes.map(g => g.guia);
 
-    // Llamar al endpoint de scraping
-    const scrapingResponse = await fetch(
-      `${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'http://localhost:3000'}/api/scrape`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          guias: guiasParaScraping,
-        }),
-      }
-    );
+    const baseUrl = process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}`
+      : 'http://localhost:3000';
+
+    const scrapingResponse = await fetch(`${baseUrl}/api/scrape`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        guias: guiasParaScraping,
+      }),
+    });
 
     if (!scrapingResponse.ok) {
       throw new Error('Error al hacer scraping de guías');
@@ -67,7 +59,6 @@ export default async function handler(req, res) {
     const scrapingData = await scrapingResponse.json();
     console.log(`Scraping completado: ${scrapingData.successful} exitosas`);
 
-    // Preparar actualizaciones para Google Sheets
     const updates = scrapingData.results
       .filter(result => result.success)
       .map(result => ({
@@ -81,7 +72,6 @@ export default async function handler(req, res) {
         },
       }));
 
-    // Actualizar en Google Sheets
     const updateResult = await updatePendingGuias(updates);
     console.log(`Actualización completada: ${updateResult.updated} guías actualizadas`);
 
@@ -103,7 +93,6 @@ export default async function handler(req, res) {
   }
 }
 
-// Configuración para aumentar el timeout (actualizaciones pueden tardar)
 export const config = {
   api: {
     bodyParser: {
@@ -111,5 +100,5 @@ export const config = {
     },
     responseLimit: false,
   },
-  maxDuration: 60, // 60 segundos máximo
+  maxDuration: 60,
 };
