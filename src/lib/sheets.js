@@ -14,31 +14,37 @@ import {
  * @returns {Object} Cliente de Google Sheets
  */
 function getGoogleSheetsClient() {
-  // Usar credenciales completas desde Base64
-  if (process.env.GOOGLE_CREDENTIALS_BASE64) {
-    const credentialsJson = Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64').toString('utf-8');
-    const credentials = JSON.parse(credentialsJson);
-
-    const auth = new google.auth.GoogleAuth({
-      credentials,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    });
-
-    const sheets = google.sheets({ version: 'v4', auth });
-
-    return {
-      sheets,
-      spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID,
-      tabName: process.env.GOOGLE_SHEETS_TAB_NAME || 'Tracking',
-    };
+  // Validar que existan las variables necesarias
+  if (!process.env.GOOGLE_CREDENTIALS_BASE64) {
+    throw new Error('GOOGLE_CREDENTIALS_BASE64 no está configurado');
   }
 
-  // Fallback al método anterior (por si acaso)
   if (!process.env.GOOGLE_SHEETS_SPREADSHEET_ID) {
     throw new Error('GOOGLE_SHEETS_SPREADSHEET_ID no está configurado');
   }
 
-  throw new Error('GOOGLE_CREDENTIALS_BASE64 no está configurado');
+  // Decodificar credenciales desde Base64
+  const credentialsJson = Buffer.from(
+    process.env.GOOGLE_CREDENTIALS_BASE64, 
+    'base64'
+  ).toString('utf-8');
+  
+  const credentials = JSON.parse(credentialsJson);
+
+  // Configurar autenticación
+  const auth = new google.auth.GoogleAuth({
+    credentials,
+    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+  });
+
+  // Crear cliente de Sheets
+  const sheets = google.sheets({ version: 'v4', auth });
+
+  return {
+    sheets,
+    spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID,
+    tabName: process.env.GOOGLE_SHEETS_TAB_NAME || 'Tracking',
+  };
 }
 
 /**
