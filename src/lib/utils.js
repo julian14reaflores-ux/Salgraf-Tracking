@@ -199,7 +199,7 @@ export function validateEnvironmentVariables() {
   const required = [
     'GOOGLE_SHEETS_SPREADSHEET_ID',
     'GOOGLE_SERVICE_ACCOUNT_EMAIL',
-    'GOOGLE_PRIVATE_KEY'
+    'GOOGLE_CREDENTIALS_BASE64'
   ];
   
   const missing = required.filter(key => !process.env[key]);
