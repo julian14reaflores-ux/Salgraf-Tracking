@@ -17,23 +17,8 @@ import {
 function getGoogleSheetsClient() {
   validateEnvironmentVariables();
 
-  // Formatear la clave privada - manejar diferentes formatos
-  let privateKey = process.env.GOOGLE_PRIVATE_KEY;
-  
-  // Si la clave viene con \\n literales, reemplazarlos por saltos de línea reales
-  if (privateKey.includes('\\n')) {
-    privateKey = privateKey.replace(/\\n/g, '\n');
-  }
-  
-  // Si la clave viene con comillas al inicio/final, removerlas
-  if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
-    privateKey = privateKey.slice(1, -1);
-  }
-  
-  // Si después de remover comillas aún tiene \\n, reemplazar de nuevo
-  if (privateKey.includes('\\n')) {
-    privateKey = privateKey.replace(/\\n/g, '\n');
-  }
+  // Decodificar la clave privada desde Base64
+  const privateKey = Buffer.from(process.env.GOOGLE_PRIVATE_KEY, 'base64').toString('utf-8');
 
   // Configurar autenticación
   const auth = new google.auth.GoogleAuth({
@@ -52,7 +37,7 @@ function getGoogleSheetsClient() {
     spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID,
     tabName: process.env.GOOGLE_SHEETS_TAB_NAME || 'Tracking',
   };
-} 
+}
 /**
  * Obtiene todas las guías de la hoja
  * @returns {Promise<Array>} Array de guías con sus datos
