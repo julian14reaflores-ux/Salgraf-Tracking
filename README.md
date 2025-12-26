@@ -172,6 +172,8 @@ La hoja debe tener estas columnas (en orden):
 
 Proyecto privado para uso interno de LAAR Courier
 
+   <!-- Force rebuild 2024-12-26 -->
+
 ## 👥 Contacto
 
 Para soporte o preguntas sobre el sistema, contactar al equipo de desarrollo.
