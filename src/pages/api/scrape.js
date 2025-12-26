@@ -16,7 +16,7 @@ import {
 } from '../../lib/scraper.js';
 
 /**
- * Obtiene el navegador configurado según el entorno
+ * Obtiene el navegador configurado
  * @returns {Promise<Object>} Navegador de Playwright
  */
 async function getBrowser() {
@@ -38,9 +38,6 @@ async function getBrowser() {
 
 /**
  * Realiza scraping de una guía específica
- * @param {string} guia - Número de guía
- * @param {Object} browser - Navegador de Playwright
- * @returns {Promise<Object>} Datos extraídos
  */
 async function scrapeGuia(guia, browser) {
   const url = buildTrackingUrl(guia);
@@ -49,25 +46,20 @@ async function scrapeGuia(guia, browser) {
   try {
     page = await browser.newPage();
     
-    // Configurar user agent
     await page.setExtraHTTPHeaders({
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     });
     
     console.log(`Navegando a: ${url}`);
     
-    // Navegar a la página
     await page.goto(url, {
       waitUntil: 'networkidle',
       timeout: 30000,
     });
 
-    // Esperar a que la página cargue
     await page.waitForTimeout(2000);
 
-    // Extraer datos de la página
     const data = await page.evaluate(() => {
-      // Función auxiliar para buscar texto en múltiples selectores
       const findText = (selectors) => {
         for (const selector of selectors) {
           const element = document.querySelector(selector);
@@ -78,7 +70,6 @@ async function scrapeGuia(guia, browser) {
         return '';
       };
 
-      // Función auxiliar para buscar en tabla
       const findInTable = (labelText) => {
         const rows = document.querySelectorAll('tr, .row');
         for (const row of rows) {
@@ -93,81 +84,25 @@ async function scrapeGuia(guia, browser) {
         return '';
       };
 
-      // Buscar estado
-      let estado = findText([
-        '.estado',
-        '#estado',
-        '[class*="estado"]',
-        '[id*="estado"]',
-      ]);
-      
-      if (!estado) {
-        estado = findInTable('estado');
-      }
+      let estado = findText(['.estado', '#estado', '[class*="estado"]']);
+      if (!estado) estado = findInTable('estado');
 
-      // Buscar ciudad origen
-      let ciudadOrigen = findText([
-        '.origen',
-        '#origen',
-        '[class*="origen"]',
-        '.ciudad-origen',
-      ]);
-      
-      if (!ciudadOrigen) {
-        ciudadOrigen = findInTable('origen');
-      }
+      let ciudadOrigen = findText(['.origen', '[class*="origen"]']);
+      if (!ciudadOrigen) ciudadOrigen = findInTable('origen');
 
-      // Buscar ciudad destino
-      let ciudadDestino = findText([
-        '.destino',
-        '#destino',
-        '[class*="destino"]',
-        '.ciudad-destino',
-      ]);
-      
-      if (!ciudadDestino) {
-        ciudadDestino = findInTable('destino');
-      }
+      let ciudadDestino = findText(['.destino', '[class*="destino"]']);
+      if (!ciudadDestino) ciudadDestino = findInTable('destino');
 
-      // Buscar entregado a
-      let entregadoA = findText([
-        '.receptor',
-        '[class*="entregado"]',
-        '[class*="receptor"]',
-      ]);
-      
-      if (!entregadoA) {
-        entregadoA = findInTable('entregado');
-        if (!entregadoA) {
-          entregadoA = findInTable('recibido');
-        }
-      }
+      let entregadoA = findText(['.receptor', '[class*="entregado"]']);
+      if (!entregadoA) entregadoA = findInTable('entregado');
 
-      // Buscar fecha de entrega
-      let fechaEntrega = findText([
-        '.fecha-entrega',
-        '[class*="fecha"]',
-      ]);
-      
-      if (!fechaEntrega) {
-        fechaEntrega = findInTable('fecha');
-      }
+      let fechaEntrega = findText(['.fecha-entrega', '[class*="fecha"]']);
+      if (!fechaEntrega) fechaEntrega = findInTable('fecha');
 
-      // Si no encontramos estado, buscar en todo el contenido
       if (!estado) {
         const bodyText = document.body.textContent;
-        const estadoPatterns = [
-          /Estado[:\s]*([^\n<>]+)/i,
-          /Status[:\s]*([^\n<>]+)/i,
-        ];
-        
-        for (const pattern of estadoPatterns) {
-          const match = bodyText.match(pattern);
-          if (match && match[1]) {
-            estado = match[1].trim();
-            break;
-          }
-        }
+        const match = bodyText.match(/Estado[:\s]*([^\n<>]+)/i);
+        if (match) estado = match[1].trim();
       }
 
       return {
@@ -180,26 +115,17 @@ async function scrapeGuia(guia, browser) {
     });
 
     await page.close();
-
-    return {
-      guia,
-      ...data,
-    };
+    return { guia, ...data };
   } catch (error) {
     if (page) {
       try {
         await page.close();
-      } catch (closeError) {
-        console.error('Error al cerrar página:', closeError);
-      }
+      } catch (e) {}
     }
     throw error;
   }
 }
 
-/**
- * Handler principal del endpoint
- */
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({
@@ -232,7 +158,6 @@ export default async function handler(req, res) {
     console.log(`Iniciando scraping de ${guiasLimpias.length} guías...`);
 
     browser = await getBrowser();
-
     const results = [];
     const delayMs = getScrapingDelay();
 
@@ -241,14 +166,10 @@ export default async function handler(req, res) {
       
       try {
         console.log(`Scraping ${i + 1}/${guiasLimpias.length}: ${guia}`);
-        
         const data = await scrapeGuia(guia, browser);
         const cleanData = cleanScrapedData(data);
         
-        results.push({
-          success: true,
-          ...cleanData,
-        });
+        results.push({ success: true, ...cleanData });
 
         if (i < guiasLimpias.length - 1) {
           await delay(delayMs);
@@ -278,13 +199,9 @@ export default async function handler(req, res) {
     if (browser) {
       try {
         await browser.close();
-      } catch (closeError) {
-        console.error('Error al cerrar navegador:', closeError);
-      }
+      } catch (e) {}
     }
 
-    return res.status(500).json(
-      handleError(error, 'Scraping de guías')
-    );
+    return res.status(500).json(handleError(error, 'Scraping de guías'));
   }
 }
