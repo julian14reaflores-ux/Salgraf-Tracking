@@ -6,7 +6,6 @@ import {
   getCurrentEcuadorDateTime,
   generateGuiaId,
   addToHistorial,
-  validateEnvironmentVariables,
   isFinalState
 } from './utils.js';
 
@@ -15,29 +14,33 @@ import {
  * @returns {Object} Cliente de Google Sheets
  */
 function getGoogleSheetsClient() {
-  validateEnvironmentVariables();
+  // Usar credenciales completas desde Base64
+  if (process.env.GOOGLE_CREDENTIALS_BASE64) {
+    const credentialsJson = Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64').toString('utf-8');
+    const credentials = JSON.parse(credentialsJson);
 
-  // Decodificar la clave privada desde Base64
-  const privateKey = Buffer.from(process.env.GOOGLE_PRIVATE_KEY, 'base64').toString('utf-8');
+    const auth = new google.auth.GoogleAuth({
+      credentials,
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
 
-  // Configurar autenticación
-  const auth = new google.auth.GoogleAuth({
-    credentials: {
-      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key: privateKey,
-    },
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-  });
+    const sheets = google.sheets({ version: 'v4', auth });
 
-  // Crear cliente de Sheets
-  const sheets = google.sheets({ version: 'v4', auth });
+    return {
+      sheets,
+      spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID,
+      tabName: process.env.GOOGLE_SHEETS_TAB_NAME || 'Tracking',
+    };
+  }
 
-  return {
-    sheets,
-    spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID,
-    tabName: process.env.GOOGLE_SHEETS_TAB_NAME || 'Tracking',
-  };
+  // Fallback al método anterior (por si acaso)
+  if (!process.env.GOOGLE_SHEETS_SPREADSHEET_ID) {
+    throw new Error('GOOGLE_SHEETS_SPREADSHEET_ID no está configurado');
+  }
+
+  throw new Error('GOOGLE_CREDENTIALS_BASE64 no está configurado');
 }
+
 /**
  * Obtiene todas las guías de la hoja
  * @returns {Promise<Array>} Array de guías con sus datos
@@ -48,14 +51,13 @@ export async function getAllGuias() {
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${tabName}!A2:J`, // Desde fila 2 hasta columna J (excluyendo encabezados)
+      range: `${tabName}!A2:J`,
     });
 
     const rows = response.data.values || [];
 
-    // Mapear filas a objetos
     return rows.map((row, index) => ({
-      rowIndex: index + 2, // +2 porque empezamos en fila 2
+      rowIndex: index + 2,
       id: row[0] || '',
       guia: row[1] || '',
       fechaCarga: row[2] || '',
@@ -97,7 +99,6 @@ export async function addGuia(guiaData) {
   try {
     const { sheets, spreadsheetId, tabName } = getGoogleSheetsClient();
 
-    // Verificar si la guía ya existe
     const existingGuia = await findGuia(guiaData.guia);
     if (existingGuia) {
       return {
@@ -107,11 +108,9 @@ export async function addGuia(guiaData) {
       };
     }
 
-    // Preparar datos para insertar
     const currentDateTime = getCurrentEcuadorDateTime();
     const id = generateGuiaId(guiaData.guia);
 
-    // Crear historial inicial
     const historialInicial = addToHistorial('[]', {
       estado: guiaData.estado || 'Desconocido',
       ciudadOrigen: guiaData.ciudadOrigen || '',
@@ -122,13 +121,13 @@ export async function addGuia(guiaData) {
       [
         id,
         guiaData.guia,
-        currentDateTime, // Fecha Carga
+        currentDateTime,
         guiaData.estado || 'Desconocido',
         guiaData.ciudadOrigen || '',
         guiaData.ciudadDestino || '',
         guiaData.entregadoA || '',
         guiaData.fechaEntrega || '',
-        currentDateTime, // Última Actualización
+        currentDateTime,
         historialInicial,
       ],
     ];
@@ -161,7 +160,6 @@ export async function updateGuia(numeroGuia, updates) {
   try {
     const { sheets, spreadsheetId, tabName } = getGoogleSheetsClient();
 
-    // Buscar la guía
     const guia = await findGuia(numeroGuia);
     if (!guia) {
       return {
@@ -172,7 +170,6 @@ export async function updateGuia(numeroGuia, updates) {
 
     const currentDateTime = getCurrentEcuadorDateTime();
 
-    // Actualizar historial si el estado cambió
     let nuevoHistorial = guia.historial;
     if (updates.estado && updates.estado !== guia.estado) {
       nuevoHistorial = addToHistorial(guia.historial, {
@@ -182,7 +179,6 @@ export async function updateGuia(numeroGuia, updates) {
       });
     }
 
-    // Preparar valores actualizados (mantener valores existentes si no se actualizan)
     const values = [
       [
         guia.id,
@@ -193,12 +189,11 @@ export async function updateGuia(numeroGuia, updates) {
         updates.ciudadDestino !== undefined ? updates.ciudadDestino : guia.ciudadDestino,
         updates.entregadoA !== undefined ? updates.entregadoA : guia.entregadoA,
         updates.fechaEntrega !== undefined ? updates.fechaEntrega : guia.fechaEntrega,
-        currentDateTime, // Siempre actualizar última actualización
+        currentDateTime,
         nuevoHistorial,
       ],
     ];
 
-    // Actualizar la fila específica
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `${tabName}!A${guia.rowIndex}:J${guia.rowIndex}`,
@@ -278,7 +273,6 @@ export async function updatePendingGuias(updates) {
 
   for (const update of updates) {
     try {
-      // Verificar si la guía existe
       const guia = await findGuia(update.guia);
       
       if (!guia) {
@@ -291,7 +285,6 @@ export async function updatePendingGuias(updates) {
         continue;
       }
 
-      // No actualizar si ya está en estado final
       if (isFinalState(guia.estado)) {
         results.skipped++;
         results.details.push({
@@ -302,7 +295,6 @@ export async function updatePendingGuias(updates) {
         continue;
       }
 
-      // Actualizar la guía
       const result = await updateGuia(update.guia, update.data);
       
       if (result.success) {
@@ -339,7 +331,6 @@ export async function getGuiasStats() {
       ultimaActualizacion: getCurrentEcuadorDateTime(),
     };
 
-    // Contar por estado
     guias.forEach(guia => {
       const estado = guia.estado || 'Desconocido';
       stats.porEstado[estado] = (stats.porEstado[estado] || 0) + 1;
