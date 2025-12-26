@@ -11,20 +11,14 @@ import {
 } from '../../lib/sheets.js';
 import { handleError } from '../../lib/utils.js';
 
-/**
- * Handler principal del endpoint
- * Soporta diferentes operaciones según el método y parámetros
- */
 export default async function handler(req, res) {
   try {
     const { method } = req;
     const { action } = req.query;
 
-    // GET: Obtener datos
     if (method === 'GET') {
       switch (action) {
         case 'all':
-          // Obtener todas las guías
           const guias = await getAllGuias();
           return res.status(200).json({
             success: true,
@@ -33,7 +27,6 @@ export default async function handler(req, res) {
           });
 
         case 'stats':
-          // Obtener estadísticas
           const stats = await getGuiasStats();
           return res.status(200).json({
             success: true,
@@ -41,7 +34,6 @@ export default async function handler(req, res) {
           });
 
         case 'recent-delivered':
-          // Obtener guías recién entregadas
           const recentlyDelivered = await getRecentlyDelivered();
           return res.status(200).json({
             success: true,
@@ -57,13 +49,11 @@ export default async function handler(req, res) {
       }
     }
 
-    // POST: Agregar o actualizar datos
     if (method === 'POST') {
       const { guias, guia, updates } = req.body;
 
       switch (action) {
         case 'add':
-          // Agregar una guía
           if (!guia) {
             return res.status(400).json({
               success: false,
@@ -75,7 +65,6 @@ export default async function handler(req, res) {
           return res.status(200).json(addResult);
 
         case 'add-multiple':
-          // Agregar múltiples guías
           if (!guias || !Array.isArray(guias)) {
             return res.status(400).json({
               success: false,
@@ -87,7 +76,6 @@ export default async function handler(req, res) {
           return res.status(200).json(addMultipleResult);
 
         case 'update':
-          // Actualizar una guía
           if (!guia || !updates) {
             return res.status(400).json({
               success: false,
@@ -106,7 +94,6 @@ export default async function handler(req, res) {
       }
     }
 
-    // Método no soportado
     return res.status(405).json({
       success: false,
       error: `Método ${method} no permitido`,
@@ -119,7 +106,6 @@ export default async function handler(req, res) {
   }
 }
 
-// Configuración para aumentar el límite de tamaño de body
 export const config = {
   api: {
     bodyParser: {
